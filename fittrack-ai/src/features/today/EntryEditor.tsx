@@ -1,11 +1,14 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CONFIDENCE_LABEL } from '../../../supabase/functions/_shared/ai/estimate.ts';
 import type { MealDraft } from '../../data/dayHooks';
+import type { MealEntryRow } from '../../data/tables';
 import { macroCheck, SLOT_LABEL, SOURCE_LABEL, type Slot, type Source } from '../../domain/meals';
 import { parseNumber } from '../../domain/validation';
 import { Banner, Button, Field, Heading, Muted, Segmented, ToggleRow } from '../../ui/components';
-import { radius, space, useTheme } from '../../ui/theme';
+import { fonts, radius, space, useTheme } from '../../ui/theme';
 
 export interface EditorTarget {
   slot: Slot;
@@ -13,6 +16,10 @@ export interface EditorTarget {
   draft: MealDraft;
   /** True when editing an entry that already exists (shows Delete). */
   existing: boolean;
+  /** The original AI estimate, shown for reference and one-tap restore. */
+  ai?: MealEntryRow['ai_estimate'];
+  /** True while the entry is still waiting for its AI estimate. */
+  estimating?: boolean;
 }
 
 const LIMITS = { kcal: 5000, protein_g: 300, carbs_g: 1000, fat_g: 500, fibre_g: 200 } as const;
@@ -36,6 +43,7 @@ export function EntryEditor({ target, onClose, onSave, onDelete, onFavourite }: 
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const ai = target.ai;
   const [name, setName] = useState(target.draft.name);
   const [text, setText] = useState<Record<NumKey, string>>({
     kcal: show(target.draft.kcal), protein_g: show(target.draft.protein_g), carbs_g: show(target.draft.carbs_g),
@@ -81,13 +89,19 @@ export function EntryEditor({ target, onClose, onSave, onDelete, onFavourite }: 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close editor" accessibilityRole="button" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} importantForAccessibility="no" />
         <View style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: Math.max(insets.bottom, space.lg) }]} accessibilityViewIsModal>
           <View style={[styles.grabber, { backgroundColor: c.hairline }]} />
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space.md, paddingBottom: space.sm }} showsVerticalScrollIndicator={false}>
-            <View>
-              <Muted>{SLOT_LABEL[target.slot]}</Muted>
-              <Heading>{target.existing ? 'Edit entry' : 'Add entry'}</Heading>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Muted>{SLOT_LABEL[target.slot]}</Muted>
+                <Heading>{target.existing ? 'Edit entry' : 'Add entry'}</Heading>
+              </View>
+              <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close editor" hitSlop={8}
+                style={[styles.close, { backgroundColor: c.sunken }]}>
+                <Ionicons name="close" size={20} color={c.text} />
+              </Pressable>
             </View>
             <Field testID="entry-name" label="What was it?" value={name} onChangeText={setName} error={submitted ? errors.name : undefined} />
             <View style={styles.grid}>
@@ -98,6 +112,18 @@ export function EntryEditor({ target, onClose, onSave, onDelete, onFavourite }: 
                 </View>
               ))}
             </View>
+            {target.estimating ? <Banner>The AI estimate will run when there is a connection. Numbers you type now are kept, and the estimate is stored next to them.</Banner> : null}
+            {ai && ai.kcal != null ? (
+              <View style={[styles.ai, { backgroundColor: c.sunken }]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 12, color: c.accent }}>AI {ai.confidence ? CONFIDENCE_LABEL[ai.confidence].toLowerCase() : 'estimate'}</Text>
+                  <Text style={{ fontFamily: fonts.heading, fontSize: 17, color: c.text, fontVariant: ['tabular-nums'] }}>
+                    {show(ai.kcal ?? null)} kcal · P {show(ai.protein_g ?? null)} · C {show(ai.carbs_g ?? null)} · F {show(ai.fat_g ?? null)}
+                  </Text>
+                </View>
+                <Button variant="quiet" label="Use these" onPress={() => setText({ kcal: show(ai.kcal ?? null), protein_g: show(ai.protein_g ?? null), carbs_g: show(ai.carbs_g ?? null), fat_g: show(ai.fat_g ?? null), fibre_g: show(ai.fibre_g ?? null) })} />
+              </View>
+            ) : null}
             {check?.discrepancy ? <Banner tone="warning">{check.note} Nothing is changed for you: correct a number if you want to.</Banner> : null}
             <Segmented label="Where it came from" value={source} onChange={setSource}
               options={(['home', 'canteen', 'ordered'] as const).map((s) => ({ value: s, label: SOURCE_LABEL[s] }))} />
@@ -125,4 +151,6 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   full: { width: '100%' },
   half: { flexGrow: 1, flexBasis: '45%' },
+  close: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  ai: { flexDirection: 'row', alignItems: 'center', gap: space.sm, borderRadius: radius.md, paddingLeft: space.md },
 });

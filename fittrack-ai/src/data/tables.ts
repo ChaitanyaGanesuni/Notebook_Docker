@@ -20,6 +20,8 @@ export const TABLES = {
   workout_sessions: { pk: 'id', date: 'date' },
   session_participants: { pk: 'id', date: null },
   exercise_sets: { pk: 'id', date: null },
+  coach_messages: { pk: 'id', date: null },
+  ai_reports: { pk: 'id', date: 'period_start' },
 } as const satisfies Record<string, { pk: string; date: string | null }>;
 
 export type TableName = keyof typeof TABLES;
@@ -27,6 +29,7 @@ export type TableName = keyof typeof TABLES;
 /** Tables pulled from the server after sign-in. Later phases add theirs. */
 export const PULL_TABLES: TableName[] = [
   'profiles', 'targets', 'programmes', 'weight_logs', 'day_logs', 'meal_entries', 'body_measurements', 'saved_meals',
+  'coach_messages', 'ai_reports',
 ];
 
 export type Row = Record<string, unknown> & { user_id: string; updated_at: string };
@@ -120,7 +123,8 @@ export interface MealEntryRow extends Row {
   sugar_g: number | null;
   sodium_mg: number | null;
   junk: boolean;
-  ai_estimate: Record<string, unknown> | null;
+  /** The original AI estimate, kept unchanged after the user edits the numbers. `{ error }` when there was no food. */
+  ai_estimate: (Partial<import('../../supabase/functions/_shared/ai/estimate.ts').MealEstimate> & { model?: string; error?: string }) | null;
   estimate_status: 'none' | 'pending' | 'done' | 'failed';
   confidence: 'low' | 'medium' | 'high' | null;
   assumption: string | null;
@@ -150,3 +154,5 @@ export interface SavedMealRow extends Row {
   items: unknown[];
   deleted_at: string | null;
 }
+
+export type { CoachMessageRow, ReportRow } from '../../supabase/functions/_shared/types.ts';

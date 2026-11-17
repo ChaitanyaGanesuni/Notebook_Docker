@@ -4,7 +4,9 @@
  */
 import type { LocalDate } from './dates';
 
-export type Sex = 'male' | 'female';
+import type { Sex } from './burn';
+
+export type { Sex };
 export type TrackSlug = 'men' | 'women' | 'couples';
 export type Presenter = 'female' | 'male';
 

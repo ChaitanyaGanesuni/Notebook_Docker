@@ -141,8 +141,10 @@ export function Field({ label, value, onChangeText, error, hint, suffix, keyboar
 }
 
 /** Segmented control with a thumb that slides to the chosen option. */
-export function Segmented<T extends string>({ label, options, value, onChange }: {
+export function Segmented<T extends string>({ label, options, value, onChange, hideLabel }: {
   label: string; options: { value: T; label: string }[]; value: T; onChange: (v: T) => void;
+  /** Keep the label for screen readers only. */
+  hideLabel?: boolean;
 }) {
   const { c, lift } = useTheme();
   const [width, setWidth] = useState(0);
@@ -155,7 +157,7 @@ export function Segmented<T extends string>({ label, options, value, onChange }:
   const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));
   return (
     <View style={{ gap: 6 }}>
-      <Text style={[styles.label, { color: c.muted }]}>{label}</Text>
+      {hideLabel ? null : <Text style={[styles.label, { color: c.muted }]}>{label}</Text>}
       <View accessibilityRole="radiogroup" accessibilityLabel={label} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         style={[styles.segmented, { backgroundColor: c.sunken }]}>
         {segment > 0 ? <Animated.View style={[styles.thumb, lift, { width: segment, backgroundColor: c.surface }, thumb]} /> : null}

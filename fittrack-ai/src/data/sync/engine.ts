@@ -33,6 +33,8 @@ export class SyncEngine {
     private readonly remote: Remote,
     private readonly userId: string,
     private readonly onDataChanged: () => void,
+    /** Extra work that needs the network, run after local changes are sent (meal estimates). Returns true if it changed data. */
+    private readonly afterPush?: () => Promise<boolean>,
   ) {}
 
   async start(): Promise<void> {
@@ -69,8 +71,15 @@ export class SyncEngine {
     useSyncStatus.setState({ syncing: true });
     let error: string | null = null;
     try {
-      const pushed = await pushOutbox(this.store, this.remote, this.userId);
+      let pushed = await pushOutbox(this.store, this.remote, this.userId);
       error = pushed.error;
+      if (!pushed.interrupted && this.afterPush) {
+        if (await this.afterPush()) {
+          this.onDataChanged();
+          pushed = await pushOutbox(this.store, this.remote, this.userId);
+          error = error ?? pushed.error;
+        }
+      }
       const needInitial = useSyncStatus.getState().initialPull !== 'done';
       if (!pushed.interrupted && (pull || needInitial)) {
         const pulled = await pullTables(this.store, this.remote, this.userId, PULL_TABLES);

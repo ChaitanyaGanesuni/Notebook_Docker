@@ -1,6 +1,11 @@
+import * as Crypto from 'expo-crypto';
+import * as Network from 'expo-network';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { useActiveProgramme, useProfile, useTargets, useWeightLogs } from '../../data/DataProvider';
+import { differsFromEstimate, localPhotoKey, PHOTO_PLACEHOLDER, retryEstimate } from '../../ai/estimateQueue';
+import { useEstimateNotices } from '../../ai/notices';
+import { keepPhoto } from '../../ai/photos';
+import { useActiveProgramme, useData, useProfile, useSaveRows, useTargets, useWeightLogs } from '../../data/DataProvider';
 import { useDayActions, useRangeData, useSavedMeals, useSlotSources, type MealDraft } from '../../data/dayHooks';
 import type { MealEntryRow } from '../../data/tables';
 import { addDays, formatLocalDate, localDateOf, weekDates } from '../../domain/dates';
@@ -25,6 +30,9 @@ export default function Today() {
   const weights = useWeightLogs();
   const saved = useSavedMeals();
   const { sources, setSource } = useSlotSources();
+  const { store, engine } = useData();
+  const save = useSaveRows();
+  const notices = useEstimateNotices();
 
   const today = localDateOf(new Date(), profile.data?.timezone ?? undefined);
   const [picked, setPicked] = useState<string | null>(null);
@@ -35,8 +43,18 @@ export default function Today() {
 
   const log = range.data?.logs.find((l) => l.date === date) ?? null;
   const actions = useDayActions(date, log);
-  const [editor, setEditor] = useState<(EditorTarget & { entry: MealEntryRow | null }) | null>(null);
+  const [editor, setEditor] = useState<(EditorTarget & { entry: MealEntryRow | null; entryId?: string }) | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  async function estimate(slot: Slot, text: string, photoUri: string | null) {
+    const id = Crypto.randomUUID();
+    if (photoUri && store) await store.setMeta(localPhotoKey(id), await keepPhoto(id, photoUri));
+    await actions.addPendingMeal(id, slot, sources[slot], text, PHOTO_PLACEHOLDER);
+    // With no connection, open the editor so numbers can be typed now; the estimate still runs later.
+    const net = await Network.getNetworkStateAsync().catch(() => null);
+    if (net && net.isConnected === false) {
+      setEditor({ slot, source: sources[slot], existing: true, estimating: true, entry: null, entryId: id, draft: { ...EMPTY_DRAFT, name: text || PHOTO_PLACEHOLDER, text } });
+    }
+  }
   const run = (p: Promise<void>) => { p.then(() => setActionError(null)).catch((e: unknown) => setActionError(e instanceof Error ? e.message : 'Could not save.')); };
 
   const summaries = useMemo(() => {
@@ -91,6 +109,7 @@ export default function Today() {
       <Appear index={1}><WeekStrip selected={date} today={today} scores={scores} onSelect={setPicked} /></Appear>
       <SyncNotice />
       {actionError ? <Banner tone="warning">{actionError}</Banner> : null}
+      {notices.notices.map((n, i) => <Banner key={i} tone="warning" action={{ label: 'OK', onPress: notices.dismiss }}>{n}</Banner>)}
 
       <Appear index={2}>
         <HeroCard summary={summary} waterMl={log?.water_ml ?? 0} targets={targets.data} programme={programme.data ?? null} date={date} isToday={isToday} />
@@ -106,8 +125,10 @@ export default function Today() {
             onAdd={(draft) => run(actions.addMeal(slot, sources[slot], draft))}
             onCopyYesterday={() => run(actions.copyMeals(yesterdayMeals.filter((m) => m.slot === slot)))}
             onCycleEntrySource={(e) => run(actions.updateMeal(e, { source: nextSource(e.source) }))}
+            onEstimate={(text, photo) => run(estimate(slot, text, photo))}
+            onRetry={(e) => { if (store) run(retryEstimate(store, save, e).then(() => engine?.sync())); }}
             onManual={(name) => setEditor({ slot, source: sources[slot], existing: false, entry: null, draft: { ...EMPTY_DRAFT, name, text: name } })}
-            onOpen={(e) => setEditor({ slot, source: e.source, existing: true, entry: e, draft: { name: e.name, text: e.text, kcal: e.kcal, protein_g: e.protein_g, carbs_g: e.carbs_g, fat_g: e.fat_g, fibre_g: e.fibre_g, junk: e.junk } })} />
+            onOpen={(e) => setEditor({ slot, source: e.source, existing: true, entry: e, ai: e.ai_estimate, estimating: e.estimate_status === 'pending', draft: { name: e.name, text: e.text, kcal: e.kcal, protein_g: e.protein_g, carbs_g: e.carbs_g, fat_g: e.fat_g, fibre_g: e.fibre_g, junk: e.junk } })} />
         </Appear>
       ))}
 
@@ -120,12 +141,12 @@ export default function Today() {
 
       {editor ? (
         <EntryEditor target={editor} onClose={() => setEditor(null)}
-          onSave={(draft, source) => {
-            const e = editor.entry;
+          onSave={async (draft, source) => {
+            // An entry opened straight after an offline add is read fresh, so the estimate queue's view stays current.
+            const e = editor.entry ?? (editor.entryId && store ? ((await store.getRow('meal_entries', editor.entryId))?.data as MealEntryRow | undefined) : undefined);
             if (!e) return actions.addMeal(editor.slot, source, draft);
-            // Keep the original AI estimate; mark the entry as the user's numbers when they differ from it.
-            const changed = (['kcal', 'protein_g', 'carbs_g', 'fat_g', 'fibre_g'] as const).some((k) => (draft[k] ?? null) !== (e[k] == null ? null : Number(e[k])));
-            return actions.updateMeal(e, { ...draft, source, edited: e.edited || (e.ai_estimate != null && changed) });
+            // The original AI estimate is kept; the entry shows "Your numbers" whenever they differ from it.
+            return actions.updateMeal(e, { ...draft, source, edited: differsFromEstimate(draft, e.ai_estimate) });
           }}
           onFavourite={(draft, source) => actions.saveFavourite({ ...draft, slot: editor.slot, source })}
           onDelete={editor.entry ? () => actions.deleteMeal(editor.entry!) : undefined} />

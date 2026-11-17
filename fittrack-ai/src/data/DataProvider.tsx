@@ -7,6 +7,10 @@ import { supabase } from '../auth/supabase';
 import { createLocalStore } from './local/createLocalStore';
 import type { LocalStore } from './local/store';
 import { saveRows, type RowInput } from './repo';
+import { callFunction, uploadMealPhoto } from '../ai/functions';
+import { processEstimates } from '../ai/estimateQueue';
+import { photoBytes } from '../ai/photos';
+import { useEstimateNotices } from '../ai/notices';
 import { SyncEngine, useSyncStatus } from './sync/engine';
 import { supabaseRemote } from './sync/supabaseRemote';
 import type { ProfileRow, ProgrammeRow, TableName, TargetsRow, WeightLogRow } from './tables';
@@ -38,9 +42,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const engine = useMemo(() => {
     if (!store || !userId || !supabase) return null;
-    return new SyncEngine(store, supabaseRemote(supabase), userId, () => {
-      void queryClient.invalidateQueries({ queryKey: ['local'] });
-    });
+    const refresh = () => void queryClient.invalidateQueries({ queryKey: ['local'] });
+    const estimates = async () => {
+      const run = await processEstimates({
+        store, userId,
+        save: (rows) => saveRows(store, rows),
+        upload: async (path, uri) => {
+          const bytes = await photoBytes(uri);
+          return bytes ? uploadMealPhoto(path, bytes) : { ok: false, retryable: false, message: 'The photo is no longer on this phone.' };
+        },
+        estimate: (body) => callFunction('estimate-meal', body),
+      });
+      for (const message of run.removed) useEstimateNotices.getState().push(`${message} Nothing was added.`);
+      return run.applied + run.failed + run.removed.length > 0;
+    };
+    return new SyncEngine(store, supabaseRemote(supabase), userId, refresh, estimates);
   }, [store, userId, queryClient]);
 
   useEffect(() => {

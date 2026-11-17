@@ -44,6 +44,8 @@ export function useSavedMeals() {
 
 type SlotSources = Record<Slot, Source>;
 
+const EMPTY_NUMBERS = { kcal: null, protein_g: null, carbs_g: null, fat_g: null, fibre_g: null, junk: false };
+
 /** The source tag last used for each slot (Home, Canteen, Ordered), remembered on the device. */
 export function useSlotSources(): { sources: SlotSources; setSource: (slot: Slot, source: Source) => Promise<void> } {
   const { store, userId } = useData();
@@ -95,6 +97,11 @@ export function useDayActions(date: string, log: DayLogRow | null) {
     return {
       patchLog: (patch: Partial<DayLogRow>) => save([{ table: 'day_logs', data: { ...baseLog(), ...patch } }]),
       addMeal: (slot: Slot, source: Source, draft: MealDraft) => save([{ table: 'meal_entries', data: mealRow(slot, source, draft) }]),
+      /** Saves a meal with empty numbers, marked for AI estimation as soon as there is a connection. */
+      addPendingMeal: (id: string, slot: Slot, source: Source, text: string, placeholder: string) => save([{
+        table: 'meal_entries',
+        data: { ...mealRow(slot, source, { ...EMPTY_NUMBERS, name: text || placeholder, text }), id, estimate_status: 'pending' },
+      }]),
       /** Copies entries into this day (used by "Same as yesterday"). */
       copyMeals: (entries: MealEntryRow[]) => save(entries.map((e) => ({
         table: 'meal_entries' as const,

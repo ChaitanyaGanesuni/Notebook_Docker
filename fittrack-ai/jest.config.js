@@ -5,7 +5,7 @@ const base = {
 };
 module.exports = {
   projects: [
-    { ...base, displayName: 'unit', testMatch: ['<rootDir>/src/**/*.test.ts'] },
+    { ...base, displayName: 'unit', testMatch: ['<rootDir>/src/**/*.test.ts', '<rootDir>/supabase/functions/**/*.test.ts'] },
     {
       ...base,
       displayName: 'db',
