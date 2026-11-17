@@ -9,8 +9,9 @@ import { formatLocalDate, isLocalDate } from '../../domain/dates';
 import { trackDefaultsForSex } from '../../domain/defaults';
 import { programmeEndDate } from '../../domain/programme';
 import { parseNumber } from '../../domain/validation';
-import { Banner, Body, Button, Card, Field, Muted, Screen, Segmented, Title, ToggleRow } from '../../ui/components';
-import { space } from '../../ui/theme';
+import { Banner, Body, Button, Card, Eyebrow, Field, Muted, Screen, Segmented, Title, ToggleRow } from '../../ui/components';
+import { Appear } from '../../ui/motion';
+import { space, useTheme } from '../../ui/theme';
 import { fromForm, toForm, type SetupForm } from './formModel';
 
 type FieldSpec = { key: string; label: string; kind?: 'text' | 'number' | 'long'; suffix?: string; hint?: string };
@@ -91,6 +92,7 @@ export function SetupFlow({ mode, profile, targets, programme, onDone }: {
 }) {
   const { userId } = useData();
   const save = useSaveRows();
+  const { c } = useTheme();
   const onboarding = mode === 'onboarding';
   const [form, setForm] = useState<SetupForm>(() => toForm(profile, targets, programme));
   const [step, setStep] = useState(0);
@@ -169,12 +171,19 @@ export function SetupFlow({ mode, profile, targets, programme, onDone }: {
 
   return (
     <Screen>
-      <View style={{ gap: space.xs }}>
-        <Muted>{onboarding ? `Step ${step + 1} of ${STEPS.length}` : `Edit · ${step + 1} of ${STEPS.length}`}</Muted>
-        <Title>{current.title}</Title>
-        <Body>{current.intro}</Body>
+      <View style={{ flexDirection: 'row', gap: 6 }} accessibilityRole="progressbar" accessibilityLabel={`Step ${step + 1} of ${STEPS.length}`}
+        accessibilityValue={{ min: 1, max: STEPS.length, now: step + 1 }}>
+        {STEPS.map((st, i) => (
+          <View key={st.title} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: i <= step ? c.accent : c.hairline }} />
+        ))}
       </View>
+      <Appear key={`head-${step}`} style={{ gap: space.xs }}>
+        <Eyebrow>{onboarding ? `Step ${step + 1} of ${STEPS.length}` : `Edit · ${step + 1} of ${STEPS.length}`}</Eyebrow>
+        <Title>{current.title}</Title>
+        <Body color={c.muted}>{current.intro}</Body>
+      </Appear>
 
+      <Appear key={`card-${step}`} index={1}>
       <Card>
         {step === 0 ? (
           <Segmented label="Sex (used only for the burn formula and the default workout track)" value={form.sex === 'female' ? 'female' : 'male'}
@@ -195,12 +204,13 @@ export function SetupFlow({ mode, profile, targets, programme, onDone }: {
           <Muted>Runs {formatLocalDate(form.start_date!)} to {formatLocalDate(endDate)}. Programme weeks are 7-day blocks counted from the start date.</Muted>
         ) : null}
       </Card>
+      </Appear>
 
       {showErrors && stepHasErrors(step) ? <Banner tone="warning">Fix the highlighted fields to continue.</Banner> : null}
       {saveError ? <Banner tone="warning">{saveError}</Banner> : null}
 
       <View style={{ gap: space.sm }}>
-        <Button label={last ? (onboarding ? 'Finish setup' : 'Save changes') : 'Next'} onPress={next} loading={saving} />
+        <Button label={last ? (onboarding ? 'Finish setup' : 'Save changes') : 'Next'} onPress={next} loading={saving} icon={last ? 'checkmark' : 'arrow-forward'} />
         {step > 0 ? <Button label="Back" variant="secondary" onPress={() => { setShowErrors(false); setStep(step - 1); }} disabled={saving} /> : null}
         {!onboarding ? <Button label="Cancel" variant="quiet" onPress={onDone} disabled={saving} /> : null}
       </View>

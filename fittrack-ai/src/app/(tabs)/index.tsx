@@ -1,12 +1,27 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useActiveProgramme, useProfile, useTargets, useWeightLogs } from '../../data/DataProvider';
+import { ProgrammeHero } from '../../features/ProgrammeHero';
 import { SyncNotice } from '../../features/SyncNotice';
 import { formatLocalDate, localDateOf } from '../../domain/dates';
-import { daysUntil, programmeProgress } from '../../domain/programme';
-import { Card, Heading, Muted, Num, Row, Screen, StateView, Title } from '../../ui/components';
-import { fonts, hero, radius, space, useTheme } from '../../ui/theme';
+import { Bullet, Card, Eyebrow, IconChip, Muted, Num, Screen, SectionHeader, StateView, Title, type IconName } from '../../ui/components';
+import { Appear, CountUp } from '../../ui/motion';
+import { fonts, radius, space, useTheme } from '../../ui/theme';
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const grouped = (n: number) => Math.round(n).toLocaleString('en-IN');
+
+function Stat({ icon, value, format, unit, tint, soft }: {
+  icon: IconName; value: number; format?: (n: number) => string; unit: string; tint: string; soft: string;
+}) {
+  const { c } = useTheme();
+  return (
+    <View style={[styles.stat, { backgroundColor: c.sunken }]} accessible accessibilityLabel={`${(format ?? grouped)(value)} ${unit}`}>
+      <IconChip icon={icon} tint={tint} soft={soft} size={30} />
+      <CountUp value={value} format={format ?? grouped}
+        style={{ fontFamily: fonts.headingBold, fontSize: 30, lineHeight: 32, color: c.text, fontVariant: ['tabular-nums'] }} />
+      <Muted>{unit}</Muted>
+    </View>
+  );
+}
 
 export default function Today() {
   const { c } = useTheme();
@@ -28,91 +43,73 @@ export default function Today() {
   }
 
   const today = localDateOf(new Date(), profile.data?.timezone ?? undefined);
-  const p = programme.data;
-  const progress = p ? programmeProgress({ startDate: p.start_date, weeks: p.weeks }, today) : null;
-  const toCheckpoint = p?.checkpoint_date ? daysUntil(p.checkpoint_date, today) : null;
-  const latestWeight = weights.data?.[weights.data.length - 1];
+  const first = weights.data?.[0];
+  const latest = weights.data?.[weights.data.length - 1];
+  const change = first && latest && first !== latest ? Number(latest.weight_kg) - Number(first.weight_kg) : null;
   const t = targets.data;
 
   return (
     <Screen>
-      <View>
-        <Muted>{formatLocalDate(today)}</Muted>
+      <Appear>
+        <Eyebrow>{formatLocalDate(today)}</Eyebrow>
         <Title>Hi {profile.data?.display_name ?? 'there'}</Title>
-      </View>
+      </Appear>
       <SyncNotice />
 
-      <View style={[styles.hero, { backgroundColor: c.court }]} accessible
-        accessibilityLabel={progress?.status === 'active' ? `Week ${progress.week} of ${progress.totalWeeks}, day ${progress.day} of ${progress.totalDays}` : 'Programme'}>
-        {/* faint badminton-court markings */}
-        <View pointerEvents="none" style={[styles.courtLine, { left: '50%', top: 0, bottom: 0, width: 1 }]} />
-        <View pointerEvents="none" style={[styles.courtLine, { left: 0, right: 0, top: '32%', height: 1 }]} />
-        <View pointerEvents="none" style={[styles.courtBorder]} />
-        {!p || !progress ? (
-          <Text style={styles.heroBody}>No programme set. Add one from the Plan tab.</Text>
-        ) : progress.status === 'active' ? (
-          <>
-            <Text style={styles.heroLabel}>{p.name || 'Programme'}</Text>
-            <Text style={styles.heroNumber}>WEEK {progress.week} <Text style={styles.heroOf}>OF {progress.totalWeeks}</Text></Text>
-            <Text style={styles.heroBody}>Day {progress.day} of {progress.totalDays}</Text>
-          </>
-        ) : progress.status === 'upcoming' ? (
-          <>
-            <Text style={styles.heroLabel}>{p.name || 'Programme'}</Text>
-            <Text style={styles.heroNumber}>STARTS IN {progress.daysToStart}</Text>
-            <Text style={styles.heroBody}>{plural(progress.daysToStart, 'day')} to go, starting {formatLocalDate(p.start_date)}</Text>
-          </>
-        ) : (
-          <>
-            <Text style={styles.heroLabel}>{p.name || 'Programme'}</Text>
-            <Text style={styles.heroNumber}>COMPLETE</Text>
-            <Text style={styles.heroBody}>All {progress.totalWeeks} weeks done</Text>
-          </>
-        )}
-        {p?.checkpoint_date && toCheckpoint !== null ? (
-          <Text style={styles.heroFoot}>
-            {toCheckpoint > 0 ? `${plural(toCheckpoint, 'day')} to the ${formatLocalDate(p.checkpoint_date)} checkpoint`
-              : toCheckpoint === 0 ? 'Checkpoint day' : `Checkpoint was ${formatLocalDate(p.checkpoint_date)}`}
-          </Text>
-        ) : null}
-      </View>
+      <Appear index={1}><ProgrammeHero programme={programme.data ?? null} today={today} /></Appear>
 
       {t ? (
-        <Card>
-          <Heading>Daily targets</Heading>
-          <View style={styles.stats}>
-            <View style={styles.stat}><Num>{t.kcal_target.toLocaleString('en-IN')}</Num><Muted>kcal</Muted></View>
-            <View style={styles.stat}><Num color={c.protein}>{t.protein_target_g}</Num><Muted>g protein</Muted></View>
-            <View style={styles.stat}><Num color={c.water}>{t.water_ml / 1000}</Num><Muted>L water</Muted></View>
-            <View style={styles.stat}><Num>{t.steps.toLocaleString('en-IN')}</Num><Muted>steps</Muted></View>
-          </View>
-        </Card>
+        <Appear index={2}>
+          <Card>
+            <SectionHeader icon="flag-outline" title="Daily targets" />
+            <View style={styles.stats}>
+              <Stat icon="flame" value={t.kcal_target} unit="kcal" tint={c.accent} soft={c.accentSoft} />
+              <Stat icon="fish" value={t.protein_target_g} unit="g protein" tint={c.protein} soft={c.proteinSoft} />
+              <Stat icon="water" value={t.water_ml / 1000} format={(n) => (Math.round(n * 10) / 10).toString()} unit="L water" tint={c.water} soft={c.waterSoft} />
+              <Stat icon="footsteps" value={t.steps} unit="steps" tint={c.text} soft={c.hairline} />
+            </View>
+          </Card>
+        </Appear>
       ) : null}
 
-      <Card>
-        <Heading>Weight</Heading>
-        {weights.isPending ? <Muted>Loading…</Muted>
-          : latestWeight ? <Row label={`Latest, ${formatLocalDate(latestWeight.date)}`} value={`${Number(latestWeight.weight_kg).toFixed(1)} kg`} />
-          : <Muted>No weigh-in logged yet.</Muted>}
-      </Card>
+      <Appear index={3}>
+        <Card>
+          <SectionHeader icon="scale-outline" title="Weight" />
+          {weights.isPending ? <Muted>Loading…</Muted> : latest ? (
+            <View style={styles.weightRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }} accessible accessibilityLabel={`${Number(latest.weight_kg).toFixed(1)} kilograms`}>
+                <Num size={52}>{Number(latest.weight_kg).toFixed(1)}</Num>
+                <Num size={22} color={c.muted}>kg</Num>
+              </View>
+              <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                <View style={[styles.tag, { backgroundColor: c.accentSoft }]}>
+                  <Muted color={c.accent} style={{ fontFamily: fonts.bodySemiBold }}>
+                    {change === null ? 'Starting point' : `${change > 0 ? '+' : ''}${change.toFixed(1)} kg since start`}
+                  </Muted>
+                </View>
+                <Muted>{formatLocalDate(latest.date)}</Muted>
+              </View>
+            </View>
+          ) : <Muted>No weigh-in logged yet.</Muted>}
+        </Card>
+      </Appear>
 
-      <Card>
-        <Heading>Meals and daily logging</Heading>
-        <Muted>Meal slots, the deficit verdict, water, steps and the rest of the day&apos;s logging are built in phase 2.</Muted>
-      </Card>
+      <Appear index={4}>
+        <View style={[styles.next, { borderColor: c.hairline }]}>
+          <Eyebrow>Built next, in phase 2</Eyebrow>
+          <Bullet icon="restaurant-outline" tint={c.muted}>Meal slots with quick adds and same-as-yesterday</Bullet>
+          <Bullet icon="pulse-outline" tint={c.muted}>Deficit verdict with calorie, protein and water rings</Bullet>
+          <Bullet icon="water-outline" tint={c.muted}>Water, steps, badminton, sleep, weight and waist</Bullet>
+        </View>
+      </Appear>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: { borderRadius: radius.lg, padding: space.xl, gap: space.xs, overflow: 'hidden' },
-  courtLine: { position: 'absolute', backgroundColor: hero.line },
-  courtBorder: { position: 'absolute', left: 10, right: 10, top: 10, bottom: 10, borderWidth: 1, borderColor: hero.line, borderRadius: radius.md },
-  heroLabel: { fontFamily: fonts.bodyMedium, fontSize: 13, color: hero.textMuted },
-  heroNumber: { fontFamily: fonts.headingBold, fontSize: 48, lineHeight: 52, color: hero.text, fontVariant: ['tabular-nums'] },
-  heroOf: { fontFamily: fonts.heading, fontSize: 28, color: hero.textMuted },
-  heroBody: { fontFamily: fonts.heading, fontSize: 20, color: hero.text, fontVariant: ['tabular-nums'] },
-  heroFoot: { fontFamily: fonts.body, fontSize: 13, color: hero.textMuted, marginTop: space.sm },
-  stats: { flexDirection: 'row', flexWrap: 'wrap', rowGap: space.md },
-  stat: { width: '50%' },
+  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  stat: { flexGrow: 1, flexBasis: '46%', borderRadius: radius.md, padding: space.md, gap: 6 },
+  weightRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md },
+  tag: { borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 4 },
+  next: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: radius.lg, padding: space.lg, gap: space.md },
 });

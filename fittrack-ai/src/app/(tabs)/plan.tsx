@@ -6,7 +6,9 @@ import { useSyncStatus } from '../../data/sync/engine';
 import { SyncNotice } from '../../features/SyncNotice';
 import { formatLocalDate } from '../../domain/dates';
 import { programmeEndDate } from '../../domain/programme';
-import { Body, Button, Card, Heading, Muted, Row, Screen, StateView, Title } from '../../ui/components';
+import { Bullet, Button, Card, Eyebrow, Muted, Row, Screen, SectionHeader, StateView, Title } from '../../ui/components';
+import { Appear } from '../../ui/motion';
+import { useTheme } from '../../ui/theme';
 
 const FOOD_RULES = [
   'Protein at every meal. Poha alone is mostly carbs.',
@@ -34,6 +36,7 @@ export default function Plan() {
   const targets = useTargets();
   const programme = useActiveProgramme();
   const pending = useSyncStatus((s) => s.pending + s.failed);
+  const { c } = useTheme();
 
   function confirmSignOut() {
     const message = pending > 0
@@ -58,11 +61,11 @@ export default function Plan() {
 
   return (
     <Screen>
-      <Title>Plan</Title>
+      <Appear><Eyebrow>Targets, rules and settings</Eyebrow><Title>Plan</Title></Appear>
       <SyncNotice />
 
       <Card>
-        <Heading>Daily targets</Heading>
+        <SectionHeader icon="flag-outline" title="Daily targets" />
         {t ? (
           <>
             <Row label="Calories" value={`${n(t.kcal_target)} kcal (${n(t.kcal_min)} to ${n(t.kcal_max)})`} />
@@ -80,7 +83,7 @@ export default function Plan() {
       </Card>
 
       <Card>
-        <Heading>Programme</Heading>
+        <SectionHeader icon="calendar-outline" title="Programme" />
         {p ? (
           <>
             <Row label="Runs" value={`${formatLocalDate(p.start_date)} to ${formatLocalDate(programmeEndDate({ startDate: p.start_date, weeks: p.weeks }))}`} />
@@ -91,22 +94,22 @@ export default function Plan() {
         ) : <Muted>No programme set.</Muted>}
       </Card>
 
-      <Card><Heading>Food rules</Heading>{FOOD_RULES.map((r) => <Body key={r}>• {r}</Body>)}</Card>
-      <Card><Heading>Swaps</Heading>{SWAPS.map((r) => <Body key={r}>• {r}</Body>)}</Card>
-      <Card><Heading>Recovery and digestion</Heading>{RECOVERY.map((r) => <Body key={r}>• {r}</Body>)}</Card>
+      <Card><SectionHeader icon="restaurant-outline" title="Food rules" tint={c.protein} soft={c.proteinSoft} />{FOOD_RULES.map((r) => <Bullet key={r} tint={c.protein}>{r}</Bullet>)}</Card>
+      <Card><SectionHeader icon="swap-horizontal" title="Swaps" />{SWAPS.map((r) => <Bullet key={r} icon="arrow-forward">{r}</Bullet>)}</Card>
+      <Card><SectionHeader icon="moon-outline" title="Recovery and digestion" tint={c.water} soft={c.waterSoft} />{RECOVERY.map((r) => <Bullet key={r} tint={c.water}>{r}</Bullet>)}</Card>
 
       <Card>
-        <Heading>Profile</Heading>
+        <SectionHeader icon="person-outline" title="Profile" />
         {me ? (
           <>
             <Row label="Name" value={me.display_name} />
             <Row label="Age" value={`${me.age}`} />
             <Row label="Height" value={`${Number(me.height_cm)} cm`} />
             <Row label="Timezone" value={me.timezone} />
-            <Row label="Account" value={email ?? ''} />
+            <Row label="Account" value={email ?? ''} last />
           </>
         ) : <Muted>No profile saved yet.</Muted>}
-        <Button label="Edit profile, targets and programme" variant="secondary" onPress={() => router.push('/settings/profile')} />
+        <Button label="Edit profile, targets and programme" variant="secondary" icon="create-outline" onPress={() => router.push('/settings/profile')} />
       </Card>
 
       <Button label="Sign out" variant="quiet" onPress={confirmSignOut} />

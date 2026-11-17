@@ -11,7 +11,7 @@ Progress and Coach tabs say so in the app rather than showing placeholder data.
 
 | Area | Where |
 |---|---|
-| Design tokens (light and dark), Barlow Condensed and Inter | `src/ui/` |
+| Design system: "night court" palette (ink, volt lime, amber, sky blue) in light and dark, Barlow Condensed and Inter, motion helpers, floating tab bar | `src/ui/` |
 | Navigation: auth, onboarding, five tabs, edit-profile modal | `src/app/` |
 | Email and password auth, session kept on the device | `src/auth/` |
 | Onboarding pre-filled from the brief, all values editable later | `src/features/setup/` |
@@ -31,6 +31,9 @@ shown in the app, never dropped.
 
 ### Decisions made in phase 1
 
+- The brief's colour tokens were replaced at the owner's request. All colours live in
+  `src/ui/theme.ts`; motion (entrances, count-ups, sliding tab highlight, press springs) uses
+  Reanimated and follows the system reduce-motion setting.
 - The programme starts on **Tuesday** 17 November 2026 (the brief said Monday). Programme
   weeks are 7-day blocks from the start date; the week strip (phase 2) uses Monday to Sunday.
 - A couples session with a linked partner is stored as **one row per account**, joined by
