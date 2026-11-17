@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { LocalStore } from '../local/store';
-import { PHASE1_PULL_TABLES } from '../tables';
+import { PULL_TABLES } from '../tables';
 import { pullTables } from './pull';
 import { pushOutbox } from './push';
 import type { Remote } from './remote';
@@ -73,7 +73,7 @@ export class SyncEngine {
       error = pushed.error;
       const needInitial = useSyncStatus.getState().initialPull !== 'done';
       if (!pushed.interrupted && (pull || needInitial)) {
-        const pulled = await pullTables(this.store, this.remote, this.userId, PHASE1_PULL_TABLES);
+        const pulled = await pullTables(this.store, this.remote, this.userId, PULL_TABLES);
         if (pulled.ok) {
           await this.store.setMeta(pulledKey(this.userId), new Date().toISOString());
           useSyncStatus.setState({ initialPull: 'done' });

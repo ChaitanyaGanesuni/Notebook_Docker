@@ -24,8 +24,10 @@ export const TABLES = {
 
 export type TableName = keyof typeof TABLES;
 
-/** Tables pulled from the server after sign-in in phase 1. Later phases add theirs. */
-export const PHASE1_PULL_TABLES: TableName[] = ['profiles', 'targets', 'programmes', 'weight_logs'];
+/** Tables pulled from the server after sign-in. Later phases add theirs. */
+export const PULL_TABLES: TableName[] = [
+  'profiles', 'targets', 'programmes', 'weight_logs', 'day_logs', 'meal_entries', 'body_measurements', 'saved_meals',
+];
 
 export type Row = Record<string, unknown> & { user_id: string; updated_at: string };
 
@@ -85,5 +87,66 @@ export interface WeightLogRow extends Row {
   id: string;
   date: string;
   weight_kg: number;
+  deleted_at: string | null;
+}
+
+export interface DayLogRow extends Row {
+  id: string;
+  date: string;
+  water_ml: number;
+  steps: number | null;
+  steps_source: 'manual' | 'health' | null;
+  badminton: boolean;
+  workout_done: boolean;
+  in_bed_on_time: boolean;
+  chai_sugar: 'full' | 'half' | 'none' | null;
+  note: string;
+}
+
+export interface MealEntryRow extends Row {
+  id: string;
+  date: string;
+  slot: 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+  source: 'home' | 'canteen' | 'ordered';
+  logged_at: string;
+  text: string;
+  photo_path: string | null;
+  name: string;
+  kcal: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  fibre_g: number | null;
+  sugar_g: number | null;
+  sodium_mg: number | null;
+  junk: boolean;
+  ai_estimate: Record<string, unknown> | null;
+  estimate_status: 'none' | 'pending' | 'done' | 'failed';
+  confidence: 'low' | 'medium' | 'high' | null;
+  assumption: string | null;
+  edited: boolean;
+  deleted_at: string | null;
+}
+
+export interface MeasurementRow extends Row {
+  id: string;
+  date: string;
+  waist_cm: number | null;
+  hip_cm: number | null;
+  deleted_at: string | null;
+}
+
+export interface SavedMealRow extends Row {
+  id: string;
+  name: string;
+  slot: MealEntryRow['slot'] | null;
+  source: MealEntryRow['source'] | null;
+  kcal: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  fibre_g: number | null;
+  junk: boolean;
+  items: unknown[];
   deleted_at: string | null;
 }

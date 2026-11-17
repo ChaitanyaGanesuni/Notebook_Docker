@@ -4,10 +4,10 @@ Personal fat-loss tracker, nutrition logger, workout guide and coach for Android
 React Native (Expo SDK 58, development builds), TypeScript strict, Expo Router, Supabase,
 TanStack Query, Zustand.
 
-**Status: phase 1 of 7 (Foundation) is built.** Phases 2 to 7 are not started; the Train,
-Progress and Coach tabs say so in the app rather than showing placeholder data.
+**Status: phases 1 (Foundation) and 2 (Core tracking) of 7 are built.** Phases 3 to 7 are not
+started; the Train, Progress and Coach tabs say so in the app rather than showing placeholder data.
 
-## What phase 1 contains
+## What is built
 
 | Area | Where |
 |---|---|
@@ -16,7 +16,9 @@ Progress and Coach tabs say so in the app rather than showing placeholder data.
 | Email and password auth, session kept on the device | `src/auth/` |
 | Onboarding pre-filled from the brief, all values editable later | `src/features/setup/` |
 | Offline-first storage and sync queue | `src/data/` |
-| Pure logic: Asia/Kolkata dates, programme week and day, validation | `src/domain/` |
+| Pure logic: Asia/Kolkata dates, programme, validation, burn estimate, deficit verdict, day score, macro check, meal totals, quick adds, food list | `src/domain/` |
+| Today tab: week strip with score rings, hero rings and verdict, four meal slots, water tank, steps, toggles, chai sugar, weight, waist, note, history by day | `src/features/today/`, `src/app/(tabs)/index.tsx` |
+| Animated rings and water tank (SVG + Reanimated) | `src/ui/Rings.tsx`, `src/ui/WaterTank.tsx` |
 | Postgres schema (22 tables), row-level security, partner-link functions, private photo buckets | `supabase/migrations/` |
 | Database tests: user isolation, partner sharing, unlinking | `supabase/tests/` |
 
@@ -28,6 +30,19 @@ is available (on save, on returning to the app, when the network comes back, and
 30 seconds while anything is waiting). Conflicts are last-write-wins per row on
 `updated_at`, enforced by a database trigger. A change the server rejects is parked and
 shown in the app, never dropped.
+
+### Decisions made in phase 2
+
+- **Macro check threshold is 5 percent, not 10.** The brief's rule says 10 percent, but its own
+  fixture (1,663.2 kcal logged against 1,548.5 from macros) is a 6.9 percent gap and must show
+  a note. One constant, `MACRO_GAP_THRESHOLD` in `src/domain/meals.ts`, controls it.
+- **Rings and the water tank are drawn with react-native-svg and Reanimated, not Skia.** Same
+  visuals and animation, and it can be exercised in a browser here. Skia can replace them later.
+- Meal logging in this phase is manual: one tap from the bundled food list, quick adds,
+  favourites, same-as-yesterday, or your own numbers. Photo and AI estimates are phase 3.
+- Steps are typed in for now; Health Connect and HealthKit sync is phase 6.
+- The 51-item food list is bundled in the app (so it works offline) and seeded into
+  `food_items`. Extending it is done by saving favourites; a food-list editor is not built.
 
 ### Decisions made in phase 1
 
@@ -85,7 +100,7 @@ Cloud builds with EAS (APK, AAB, iOS) are set up in phase 7.
 ## Tests
 
 ```bash
-npm test             # unit tests: dates, programme, validation, form, local store, sync queue
+npm test             # unit tests: dates, programme, validation, form, burn, verdict, score, macro check, local store, sync queue
 npm run test:db      # database tests: needs Postgres installed locally (or TEST_DATABASE_URL)
 npm run typecheck
 npm run lint
@@ -103,15 +118,17 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm ru
 
 ## Not verified yet
 
-Phase 1 was built in a cloud container with no phone, emulator or Supabase project.
+Phases 1 and 2 were built in a cloud container with no phone, emulator or Supabase project.
 
 - **Nothing has run on Android or iOS.** The screens were exercised as a web build in a
-  headless browser against a mock backend (screenshots in `docs/phase1/`).
+  headless browser against a mock backend (screenshots in `docs/phase1/` and `docs/phase2/`).
 - **Real Supabase.** Migrations and policies were tested on plain Postgres 16 with the
   stand-in above, not on a Supabase project. Storage policies were tested against a
   stand-in `storage.objects` table, not Supabase Storage. Sign-up, sign-in and the email
   confirmation flow have not run against Supabase Auth.
 - **On-device SQLite.** The store's SQL is unit-tested with Node's SQLite; the expo-sqlite
   adapter and the session key-value store have only been type-checked.
-- **Device behaviour.** Font loading, safe areas, the keyboard, network-change detection and
+- **Animation on a phone.** Ring draw-in, the water wave, count-ups and springs have only run
+  in a desktop browser; frame rate on a mid-range Android phone is unmeasured.
+- **Device behaviour.** Haptics, font loading, safe areas, the keyboard, network-change detection and
   background and foreground sync on a phone.

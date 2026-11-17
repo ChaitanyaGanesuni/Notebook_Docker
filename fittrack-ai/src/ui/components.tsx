@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   buttonLabel: { fontFamily: fonts.bodySemiBold, fontSize: 16, letterSpacing: 0.2 },
   label: { fontFamily: fonts.bodyMedium, fontSize: 13 },
   inputRow: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.md, borderWidth: 1.5, paddingHorizontal: space.lg },
-  input: { flex: 1, minHeight: 50, fontFamily: fonts.bodyMedium, fontSize: 16, paddingVertical: space.sm, outlineWidth: 0 } as TextStyle,
+  input: { flex: 1, minWidth: 0, minHeight: 50, fontFamily: fonts.bodyMedium, fontSize: 16, paddingVertical: space.sm, outlineStyle: 'none' } as object,
   suffix: { fontFamily: fonts.body, fontSize: 14, marginLeft: space.sm },
   help: { fontFamily: fonts.body, fontSize: 12, lineHeight: 16 },
   segmented: { flexDirection: 'row', borderRadius: radius.md, padding: 3 },

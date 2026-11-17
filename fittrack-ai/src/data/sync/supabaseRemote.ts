@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { PAGE_SIZE } from './pull';
 import type { Remote } from './remote';
 
 /** Statuses worth retrying later: no response, timeouts, rate limits, expired session, server errors. */
@@ -14,7 +15,7 @@ export function supabaseRemote(client: SupabaseClient): Remote {
       return { ok: false, retryable: isRetryable(status), message: error.message || `HTTP ${status}` };
     },
     async fetchSince(table, userId, since) {
-      let query = client.from(table).select('*').eq('user_id', userId).order('updated_at', { ascending: true }).limit(1000);
+      let query = client.from(table).select('*').eq('user_id', userId).order('updated_at', { ascending: true }).limit(PAGE_SIZE);
       if (since) query = query.gte('updated_at', since);
       const { data, error } = await query;
       if (error) return { ok: false, message: error.message };
