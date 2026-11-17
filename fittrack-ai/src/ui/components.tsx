@@ -146,7 +146,7 @@ export function Segmented<T extends string>({ label, options, value, onChange, h
   /** Keep the label for screen readers only. */
   hideLabel?: boolean;
 }) {
-  const { c, lift } = useTheme();
+  const { c, lift, dark } = useTheme();
   const [width, setWidth] = useState(0);
   const index = Math.max(0, options.findIndex((o) => o.value === value));
   const segment = width > 0 ? (width - 6) / options.length : 0;
@@ -160,7 +160,7 @@ export function Segmented<T extends string>({ label, options, value, onChange, h
       {hideLabel ? null : <Text style={[styles.label, { color: c.muted }]}>{label}</Text>}
       <View accessibilityRole="radiogroup" accessibilityLabel={label} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         style={[styles.segmented, { backgroundColor: c.sunken }]}>
-        {segment > 0 ? <Animated.View style={[styles.thumb, lift, { width: segment, backgroundColor: c.surface }, thumb]} /> : null}
+        {segment > 0 ? <Animated.View style={[styles.thumb, lift, { width: segment, backgroundColor: dark ? '#353D4A' : c.surface }, thumb]} /> : null}
         {options.map((o) => {
           const on = o.value === value;
           return (
@@ -184,7 +184,7 @@ export function ToggleRow({ label, hint, value, onChange }: { label: string; hin
         {hint ? <Muted>{hint}</Muted> : null}
       </View>
       <Switch accessibilityLabel={label} accessibilityHint={hint} value={value} onValueChange={onChange}
-        trackColor={{ true: c.accent, false: c.hairline }} />
+        trackColor={{ true: c.accent, false: c.hairline }} thumbColor="#FFFFFF" ios_backgroundColor={c.hairline} />
     </View>
   );
 }

@@ -113,6 +113,14 @@ describe.each(implementations)('%s', (_name, make) => {
     expect(await store.counts(U1)).toEqual({ pending: 1, failed: 0 });
   });
 
+  it('queues rows written into a partner\'s account under the account that wrote them', async () => {
+    await store.write([weight('p1', U2, '2026-11-19', 60, 't1')], byId, U1);
+    expect(await store.pendingMutations(U1, 10)).toHaveLength(1);
+    expect(await store.pendingMutations(U2, 10)).toHaveLength(0);
+    expect((await store.pendingMutations(U1, 10))[0]!.payload.user_id).toBe(U2);
+    expect(await store.listRows('weight_logs', U1)).toHaveLength(0); // still the partner's row
+  });
+
   it('stores small settings', async () => {
     expect(await store.getMeta('k')).toBeNull();
     await store.setMeta('k', 'a');

@@ -48,8 +48,12 @@ export interface LocalStore {
   init(): Promise<void>;
   getRow(table: TableName, id: string): Promise<LocalRow | null>;
   listRows(table: TableName, userId: string, options?: ListOptions): Promise<LocalRow[]>;
-  /** Saves rows and queues them for sync, all or nothing. */
-  write(rows: LocalRow[], onConflict: (row: LocalRow) => string): Promise<void>;
+  /**
+   * Saves rows and queues them for sync, all or nothing. `actorId` is the signed-in account sending
+   * the change; it defaults to each row's owner, and differs only for rows written into a linked
+   * partner's account (a couples session).
+   */
+  write(rows: LocalRow[], onConflict: (row: LocalRow) => string, actorId?: string): Promise<void>;
   /**
    * Merges rows fetched from the server. A local row wins when it is newer or
    * still has an unsent change. Returns how many rows were applied.

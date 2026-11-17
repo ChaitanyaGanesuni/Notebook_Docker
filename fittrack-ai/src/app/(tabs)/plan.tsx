@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { Alert, Platform } from 'react-native';
 import { useAuth } from '../../auth/AuthProvider';
-import { useActiveProgramme, useProfile, useTargets } from '../../data/DataProvider';
+import { useActiveProgramme, useProfile, useSaveRows, useTargets } from '../../data/DataProvider';
 import { useSyncStatus } from '../../data/sync/engine';
 import { SyncNotice } from '../../features/SyncNotice';
 import { formatLocalDate } from '../../domain/dates';
 import { programmeEndDate } from '../../domain/programme';
-import { Bullet, Button, Card, Eyebrow, Muted, Row, Screen, SectionHeader, StateView, Title } from '../../ui/components';
+import { Bullet, Button, Card, Eyebrow, Muted, Row, Screen, SectionHeader, Segmented, StateView, Title } from '../../ui/components';
 import { Appear } from '../../ui/motion';
 import { useTheme } from '../../ui/theme';
 
@@ -36,6 +36,7 @@ export default function Plan() {
   const targets = useTargets();
   const programme = useActiveProgramme();
   const pending = useSyncStatus((s) => s.pending + s.failed);
+  const save = useSaveRows();
   const { c } = useTheme();
 
   function confirmSignOut() {
@@ -109,6 +110,10 @@ export default function Plan() {
             <Row label="Account" value={email ?? ''} last />
           </>
         ) : <Muted>No profile saved yet.</Muted>}
+        <Segmented label="Exercise demos show" value={me?.demo_presenter ?? 'male'}
+          onChange={(v) => { if (me) void save([{ table: 'profiles', data: { ...me, demo_presenter: v } }]); }}
+          options={[{ value: 'female', label: 'Female presenter' }, { value: 'male', label: 'Male presenter' }]} />
+        <Muted>Separate from your profile. Couples moves always show a pair.</Muted>
         <Button label="Edit profile, targets and programme" variant="secondary" icon="create-outline" onPress={() => router.push('/settings/profile')} />
       </Card>
 

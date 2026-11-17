@@ -36,11 +36,26 @@ export async function loadHistory(
   const defaultFrom = addDays(today, -(days - 1));
   const requested = earliest?.(today) ?? null;
   const from = requested !== null && requested < defaultFrom ? requested : defaultFrom;
-  const [programme, meals, logs, weights, measurements] = await Promise.all([
+  const [programme, meals, rawLogs, weights, measurements, workoutDates] = await Promise.all([
     db.getActiveProgramme(), db.listMeals(from, today), db.listDayLogs(from, today), db.listWeights(today), db.listMeasurements(from, today),
+    db.listWorkoutDates(from, today),
   ]);
-  return { today, profile, targets, programme, meals, logs, weights, measurements };
+  return { today, profile, targets, programme, meals, logs: mergeWorkouts(rawLogs, workoutDates), weights, measurements };
 }
 
 export const isResult = (x: unknown): x is HandlerResult =>
   typeof x === 'object' && x !== null && 'status' in x && 'body' in x;
+
+/**
+ * A finished workout session counts as the day's strength workout, even if the
+ * day's toggle was not set (for example a couples session recorded on the
+ * partner's phone).
+ */
+export function mergeWorkouts(logs: UserHistory['logs'], workoutDates: string[]): UserHistory['logs'] {
+  const dates = new Set(workoutDates);
+  const out = logs.map((l) => (dates.has(l.date) ? { ...l, workout_done: true } : l));
+  for (const d of dates) {
+    if (!out.some((l) => l.date === d)) out.push({ date: d, water_ml: 0, steps: null, badminton: false, workout_done: true, in_bed_on_time: false, chai_sugar: null });
+  }
+  return out;
+}

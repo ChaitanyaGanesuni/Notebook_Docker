@@ -7,6 +7,7 @@ import { useEstimateNotices } from '../../ai/notices';
 import { keepPhoto } from '../../ai/photos';
 import { useActiveProgramme, useData, useProfile, useSaveRows, useTargets, useWeightLogs } from '../../data/DataProvider';
 import { useDayActions, useRangeData, useSavedMeals, useSlotSources, type MealDraft } from '../../data/dayHooks';
+import { useSessions } from '../../data/trainingHooks';
 import type { MealEntryRow } from '../../data/tables';
 import { addDays, formatLocalDate, localDateOf, weekDates } from '../../domain/dates';
 import { summariseDay } from '../../domain/day';
@@ -41,7 +42,13 @@ export default function Today() {
   const yesterday = addDays(date, -1);
   const range = useRangeData(addDays(week[0]!, -1), week[6]!);
 
-  const log = range.data?.logs.find((l) => l.date === date) ?? null;
+  const sessions = useSessions();
+  // A finished guided or couples workout counts as the day's workout, even if it was recorded on a partner's phone.
+  const trainedOn = new Set((sessions.data ?? []).map((s) => s.session.date));
+  const withSessions = <T extends { workout_done: boolean }>(l: T | null, d: string): T | null =>
+    l ? (trainedOn.has(d) ? { ...l, workout_done: true } : l) : null;
+  const rawLog = range.data?.logs.find((l) => l.date === date) ?? null;
+  const log = rawLog;
   const actions = useDayActions(date, log);
   const [editor, setEditor] = useState<(EditorTarget & { entry: MealEntryRow | null; entryId?: string }) | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -64,7 +71,8 @@ export default function Today() {
       if (d > today) continue;
       out[d] = summariseDay({
         date: d, today, profile: profile.data, targets: targets.data,
-        log: range.data.logs.find((l) => l.date === d) ?? null,
+        log: withSessions(range.data.logs.find((l) => l.date === d) ?? null, d)
+          ?? (trainedOn.has(d) ? { water_ml: 0, steps: null, badminton: false, workout_done: true, in_bed_on_time: false } : null),
         meals: range.data.meals.filter((m) => m.date === d),
         weights: weights.data ?? [],
       });
@@ -132,7 +140,7 @@ export default function Today() {
         </Appear>
       ))}
 
-      <DayLogging key={date} date={date} log={log} waterTarget={targets.data.water_ml} stepsTarget={targets.data.steps}
+      <DayLogging key={date} date={date} log={log} workoutRecorded={trainedOn.has(date)} waterTarget={targets.data.water_ml} stepsTarget={targets.data.steps}
         weight={weightToday === null ? null : Number(weightToday)} measurement={measurement} chaiSugar={chaiSugar}
         bedtime={String(targets.data.bedtime_target).slice(0, 5)}
         onPatch={(patch) => run(actions.patchLog(patch))}

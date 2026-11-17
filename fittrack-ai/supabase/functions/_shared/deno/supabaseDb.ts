@@ -54,6 +54,11 @@ export function supabaseDb(client: SupabaseClient, userId: string): UserDb {
         .gte('date', from).lte('date', to).is('deleted_at', null).limit(1000));
       return (rows ?? []).map(numeric);
     },
+    async listWorkoutDates(from, to) {
+      const rows = must(await client.from('workout_sessions').select('date').eq('user_id', userId)
+        .gte('date', from).lte('date', to).not('finished_at', 'is', null).is('deleted_at', null).limit(1000)) ?? [];
+      return [...new Set(rows.map((r: { date: string }) => r.date))];
+    },
     async recentCoachMessages(limit) {
       return (must(await client.from('coach_messages').select('*').eq('user_id', userId)
         .order('created_at', { ascending: false }).limit(limit)) ?? []) as CoachMessageRow[];

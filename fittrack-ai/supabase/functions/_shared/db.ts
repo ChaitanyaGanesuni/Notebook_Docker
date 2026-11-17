@@ -16,6 +16,8 @@ export interface UserDb {
   listDayLogs(from: string, to: string): Promise<DayLogLite[]>;
   listWeights(to: string): Promise<WeightLite[]>;
   listMeasurements(from: string, to: string): Promise<MeasurementLite[]>;
+  /** Dates of the user's own finished workout sessions (guided or couples). */
+  listWorkoutDates(from: string, to: string): Promise<string[]>;
   recentCoachMessages(limit: number): Promise<CoachMessageRow[]>;
   countUserMessagesSince(isoInstant: string): Promise<number>;
   /** created_at is set by the caller so the question always sorts before its answer. */

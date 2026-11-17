@@ -97,7 +97,7 @@ export class SqlStore implements LocalStore {
     });
   }
 
-  write(rows: LocalRow[], onConflict: (row: LocalRow) => string): Promise<void> {
+  write(rows: LocalRow[], onConflict: (row: LocalRow) => string, actorId?: string): Promise<void> {
     return this.exclusive(() => this.transaction(async () => {
       const now = new Date().toISOString();
       for (const r of rows) {
@@ -105,14 +105,14 @@ export class SqlStore implements LocalStore {
         // Fold into an unsent change for the same row when there is one (keeps its place in the queue).
         const existing = await this.db.all<{ seq: number }>(
           `select seq from outbox where user_id = ? and tbl = ? and row_id = ? and status = 'pending' order by seq desc limit 1`,
-          [r.user_id, r.table, r.id]);
+          [actorId ?? r.user_id, r.table, r.id]);
         const payload = JSON.stringify(r.data);
         if (existing[0]) {
           await this.db.run(`update outbox set payload = ?, version = version + 1 where seq = ?`, [payload, existing[0].seq]);
         } else {
           await this.db.run(
             `insert into outbox (user_id, tbl, row_id, payload, on_conflict, created_at) values (?, ?, ?, ?, ?, ?)`,
-            [r.user_id, r.table, r.id, payload, onConflict(r), now]);
+            [actorId ?? r.user_id, r.table, r.id, payload, onConflict(r), now]);
         }
       }
     }));

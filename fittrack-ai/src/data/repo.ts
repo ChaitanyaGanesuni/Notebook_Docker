@@ -19,8 +19,8 @@ export function stampRow(input: RowInput, now: Date): LocalRow {
 }
 
 /** Saves rows on the device and queues them for sync in one atomic step. Works offline. */
-export async function saveRows(store: LocalStore, inputs: RowInput[], now: Date = new Date()): Promise<LocalRow[]> {
+export async function saveRows(store: LocalStore, inputs: RowInput[], now: Date = new Date(), actorId?: string): Promise<LocalRow[]> {
   const rows = inputs.map((i) => stampRow(i, now));
-  await store.write(rows, (r) => TABLES[r.table].pk);
+  await store.write(rows, (r) => TABLES[r.table].pk, actorId);
   return rows;
 }

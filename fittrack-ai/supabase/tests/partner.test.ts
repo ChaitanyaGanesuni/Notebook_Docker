@@ -1,4 +1,12 @@
-import { admin, as, createUser, deleteUsers, errorCode, RLS_VIOLATION, sudo } from './helpers';
+import { randomUUID } from 'node:crypto';
+import { buildSessionRows } from '../../src/domain/training/sessionRows';
+import { admin, as, createUser, deleteUsers, errorCode, RLS_VIOLATION, sudo, type Db } from './helpers';
+
+/** Inserts a row exactly as the app's sync would send it. */
+const insertRow = (db: Db, table: string, data: Record<string, unknown>) => {
+  const keys = Object.keys(data);
+  return db.exec(`insert into ${table} (${keys.join(', ')}) values (${keys.map((_, i) => `$${i + 1}`).join(', ')})`, keys.map((k) => data[k]));
+};
 
 /**
  * alice and bob link as partners; carol is an unrelated signed-in user.
@@ -70,8 +78,9 @@ describe('inviting and accepting', () => {
   });
 
   it('links the two accounts once the invitee accepts', async () => {
-    const link = (await as(bob, (db) => db.query<{ status: string; addressee_id: string }>(`select * from accept_partner_invite($1)`, [code.toLowerCase()])))[0]!;
-    expect(link).toMatchObject({ status: 'accepted', addressee_id: bob });
+    await as(bob, (db) => db.exec(`insert into profiles (user_id, display_name, sex, age, height_cm) values ($1, 'Bob', 'male', 28, 175)`, [bob]));
+    const link = (await as(bob, (db) => db.query<{ status: string; addressee_id: string; requester_name: string; addressee_name: string }>(`select * from accept_partner_invite($1)`, [code.toLowerCase()])))[0]!;
+    expect(link).toMatchObject({ status: 'accepted', addressee_id: bob, requester_name: 'Alice', addressee_name: 'Bob' });
     expect(await as(bob, (db) => db.query(`select 1 from partner_links`))).toHaveLength(1);
     expect(await as(carol, (db) => db.query(`select 1 from partner_links`))).toHaveLength(0);
   });
@@ -86,6 +95,11 @@ describe('linked, default sharing', () => {
   it('keeps meals, weight, measurements, photos, coach chats, notes and profile private', async () => {
     for (const t of PRIVATE_TABLES) expect(await visible(bob, t, alice)).toBe(0);
     expect(await as(bob, (db) => db.query(`select 1 from storage.objects`))).toHaveLength(0);
+  });
+
+  it('shares the display name through the link, never the profile', async () => {
+    expect(await as(alice, (db) => db.query(`select addressee_name from partner_links where id = $1`, [linkId]))).toEqual([{ addressee_name: 'Bob' }]);
+    expect(await visible(alice, 'profiles', bob)).toBe(0);
   });
 
   it('lets the phone owner record a couples session to both accounts', async () => {
@@ -105,8 +119,8 @@ describe('linked, default sharing', () => {
   it('shows both partners the couples session with each person\'s own reps', async () => {
     const reps = await as(bob, (db) => db.query<{ user_id: string; reps: number }>(`select user_id, reps from exercise_sets where exercise_slug = 'you-go-i-go-push-ups' order by reps`));
     expect(reps).toEqual([{ user_id: bob, reps: 5 }, { user_id: alice, reps: 8 }]);
-    expect(await visible(bob, 'workout_sessions', alice)).toBe(1);
-    expect(await visible(alice, 'session_participants', bob)).toBe(1);
+    expect(await visible(bob, 'workout_sessions', alice)).toBeGreaterThanOrEqual(1);
+    expect(await visible(alice, 'session_participants', bob)).toBeGreaterThanOrEqual(1);
   });
 
   it('lets each person rate their own copy', async () => {
@@ -114,6 +128,24 @@ describe('linked, default sharing', () => {
     const rows = await sudo.query<{ id: string; difficulty: number }>(`select id, difficulty from session_participants where id = any($1::uuid[])`, [[ids.participant_a, ids.participant_b]]);
     expect(rows.find((r) => r.id === ids.participant_a)!.difficulty).toBe(3);
     expect(rows.find((r) => r.id === ids.participant_b)!.difficulty).toBe(5);
+  });
+
+  it('accepts the rows the app builds for a linked couples session, in the order it sends them', async () => {
+    const rows = buildSessionRows({
+      date: '2026-11-21', track: 'couples', programmeWeek: 1, startedAt: Date.parse('2026-11-21T13:00:00Z'), finishedAt: Date.parse('2026-11-21T13:28:00Z'),
+      results: [
+        { who: 'me', move: 4, slug: 'you-go-i-go-push-ups', set: 1, level: 0, reps: 11, holdSeconds: null },
+        { who: 'partner', move: 4, slug: 'you-go-i-go-push-ups', set: 1, level: 0, reps: 7, holdSeconds: null },
+        { who: 'me', move: 5, slug: 'back-to-back-sit', set: 1, level: 0, reps: null, holdSeconds: 30 },
+        { who: 'partner', move: 5, slug: 'back-to-back-sit', set: 1, level: 0, reps: null, holdSeconds: 30 },
+      ],
+      me: { userId: alice, difficulty: 3 }, partner: { kind: 'linked', userId: bob, name: 'Bob', difficulty: 4 }, newId: () => randomUUID(),
+    });
+    await as(alice, async (db) => { for (const r of rows) await insertRow(db, r.table, r.data); });
+    const bobsView = await as(bob, (db) => db.query<{ reps: number | null; hold_seconds: number | null; difficulty: number; best_pushup_set: number }>(
+      `select s.reps, s.hold_seconds, p.difficulty, p.best_pushup_set from exercise_sets s join session_participants p on p.id = s.participant_id
+       join workout_sessions w on w.id = s.session_id where w.user_id = $1 and w.date = '2026-11-21' order by s.exercise_slug`, [bob]));
+    expect(bobsView).toEqual([{ reps: null, hold_seconds: 30, difficulty: 4, best_pushup_set: 7 }, { reps: 7, hold_seconds: null, difficulty: 4, best_pushup_set: 7 }]);
   });
 
   it('never shares a solo session, and never lets a partner write one into the other account', async () => {
@@ -185,9 +217,9 @@ describe('unlinking', () => {
   });
 
   it('leaves each person their own copy of past couples sessions', async () => {
-    expect(await visible(bob, 'workout_sessions', bob)).toBe(1);
-    expect(await visible(bob, 'exercise_sets', bob)).toBe(1);
-    expect(await visible(alice, 'workout_sessions', alice, 'and is_couples')).toBe(1);
+    expect(await visible(bob, 'workout_sessions', bob)).toBe(2);
+    expect(await visible(bob, 'exercise_sets', bob)).toBe(3);
+    expect(await visible(alice, 'workout_sessions', alice, 'and is_couples')).toBe(2);
   });
 
   it('stops writes into the former partner\'s account', async () => {

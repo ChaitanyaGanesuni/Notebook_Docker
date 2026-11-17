@@ -21,6 +21,8 @@ export const TABLES = {
   session_participants: { pk: 'id', date: null },
   exercise_sets: { pk: 'id', date: null },
   coach_messages: { pk: 'id', date: null },
+  workout_tracks: { pk: 'id', date: null },
+  track_exercises: { pk: 'id', date: null },
   ai_reports: { pk: 'id', date: 'period_start' },
 } as const satisfies Record<string, { pk: string; date: string | null }>;
 
@@ -29,7 +31,7 @@ export type TableName = keyof typeof TABLES;
 /** Tables pulled from the server after sign-in. Later phases add theirs. */
 export const PULL_TABLES: TableName[] = [
   'profiles', 'targets', 'programmes', 'weight_logs', 'day_logs', 'meal_entries', 'body_measurements', 'saved_meals',
-  'coach_messages', 'ai_reports',
+  'coach_messages', 'ai_reports', 'workout_tracks', 'track_exercises', 'workout_sessions', 'session_participants', 'exercise_sets',
 ];
 
 export type Row = Record<string, unknown> & { user_id: string; updated_at: string };
@@ -156,3 +158,15 @@ export interface SavedMealRow extends Row {
 }
 
 export type { CoachMessageRow, ReportRow } from '../../supabase/functions/_shared/types.ts';
+
+export interface WorkoutTrackRow extends Row { id: string; slug: string; name: string; description: string; sets_per_move: number; rest_seconds: number; is_couples: boolean }
+export interface TrackExerciseRow extends Row { id: string; track_id: string; exercise_id: string; position: number; sets: number; target: number | null; level: number; target_note: string }
+export interface WorkoutSessionRow extends Row {
+  id: string; date: string; track_id: string | null; track_slug: string; is_couples: boolean; couple_group_id: string | null;
+  programme_week: number | null; started_at: string; finished_at: string | null; duration_s: number | null; deleted_at: string | null;
+}
+export interface SessionParticipantRow extends Row { id: string; session_id: string; is_guest: boolean; guest_name: string | null; difficulty: number | null; best_pushup_set: number | null }
+export interface ExerciseSetRow extends Row {
+  id: string; session_id: string; participant_id: string; exercise_id: string | null; exercise_slug: string; set_number: number;
+  reps: number | null; hold_seconds: number | null; level: number | null; completed: boolean; deleted_at: string | null;
+}

@@ -68,9 +68,11 @@ function ToggleTile({ icon, label, on, onPress }: { icon: IconName; label: strin
 }
 
 /** Rest-of-day logging: each item is one tap or one number. */
-export function DayLogging({ date, log, waterTarget, stepsTarget, weight, measurement, chaiSugar, bedtime, onPatch, onWeight, onWaist }: {
+export function DayLogging({ date, log, workoutRecorded = false, waterTarget, stepsTarget, weight, measurement, chaiSugar, bedtime, onPatch, onWeight, onWaist }: {
   date: string;
   log: DayLogRow | null;
+  /** A guided or couples session was saved for this day. */
+  workoutRecorded?: boolean;
   waterTarget: number;
   stepsTarget: number;
   weight: number | null;
@@ -138,7 +140,8 @@ export function DayLogging({ date, log, waterTarget, stepsTarget, weight, measur
           placeholder="Not logged: 7,000 assumed" onCommit={(n) => onPatch({ steps: n, steps_source: 'manual' })} />
         <View style={styles.tiles}>
           <ToggleTile icon="tennisball-outline" label="Badminton" on={log?.badminton ?? false} onPress={() => onPatch({ badminton: !(log?.badminton ?? false) })} />
-          <ToggleTile icon="barbell-outline" label="Workout" on={log?.workout_done ?? false} onPress={() => onPatch({ workout_done: !(log?.workout_done ?? false) })} />
+          <ToggleTile icon="barbell-outline" label={workoutRecorded ? 'Workout recorded' : 'Workout'} on={workoutRecorded || (log?.workout_done ?? false)}
+            onPress={() => { if (!workoutRecorded) onPatch({ workout_done: !(log?.workout_done ?? false) }); }} />
           <ToggleTile icon="bed-outline" label={`In bed by ${bedtime}`} on={log?.in_bed_on_time ?? false} onPress={() => onPatch({ in_bed_on_time: !(log?.in_bed_on_time ?? false) })} />
         </View>
         <Segmented label="Chai sugar today" value={chaiSugar} onChange={(v) => onPatch({ chai_sugar: v })}

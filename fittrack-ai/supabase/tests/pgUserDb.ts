@@ -48,6 +48,10 @@ export function pgUserDb(userId: string): UserDb & { queries: string[] } {
     async listMeasurements(from, to) {
       return (await q(`select date::text, waist_cm from body_measurements where date between $1 and $2 and deleted_at is null`, [from, to])).map(num) as never;
     },
+    async listWorkoutDates(from, to) {
+      // Here the user filter is required: a linked partner can also read shared couples sessions.
+      return (await q<{ date: string }>(`select distinct date::text from workout_sessions where user_id = $1 and date between $2 and $3 and finished_at is not null and deleted_at is null`, [userId, from, to])).map((r) => r.date);
+    },
     async recentCoachMessages(limit) {
       return (await q(`select * from coach_messages order by created_at desc limit $1`, [limit])).map((r) => rowOut<CoachMessageRow>(r));
     },

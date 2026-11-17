@@ -60,6 +60,8 @@ function Navigator() {
       <Stack.Protected redirectTo={home} guard={signedIn && gate === 'ready'}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings/profile" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="exercise/[slug]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="workout" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
       </Stack.Protected>
     </Stack>
   );

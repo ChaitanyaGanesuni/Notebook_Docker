@@ -125,6 +125,15 @@ describe('coach-chat', () => {
     // the other user cannot read them
     expect(await as(other, (d) => d.query(`select 1 from coach_messages where user_id = $1`, [me]))).toHaveLength(0);
   });
+  it('counts a finished workout session as that day\'s workout', async () => {
+    await as(me, (d) => d.exec(`insert into workout_sessions (user_id, date, track_slug, finished_at) values ($1, '2026-11-23', 'men', now())`, [me]));
+    const ai = fakeProvider(() => 'ok');
+    await coachChat({ message: 'Did I train this week?' }, { db: pgUserDb(me), ai, now: new Date(NOW.getTime() + 30_000) });
+    expect(ai.calls[0]!.system).toMatch(/2026-11-23 \(only 1 of 3 main meals logged\):.*strength workout yes/);
+    await sudo.exec(`delete from workout_sessions where user_id = $1`, [me]);
+    await sudo.exec(`delete from coach_messages where user_id = $1 and content in ('Did I train this week?', 'ok')`, [me]);
+  });
+
   it('sends earlier turns as conversation history, oldest first', async () => {
     const ai = fakeProvider(() => 'Two eggs at breakfast.');
     await coachChat({ message: 'What should I add?' }, { db: pgUserDb(me), ai, now: new Date(NOW.getTime() + 60_000) });

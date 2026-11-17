@@ -33,19 +33,19 @@ export class MemoryStore implements LocalStore {
       .map(MemoryStore.clone);
   }
 
-  async write(rows: LocalRow[], onConflict: (row: LocalRow) => string): Promise<void> {
+  async write(rows: LocalRow[], onConflict: (row: LocalRow) => string, actorId?: string): Promise<void> {
     const prepared = rows.map((r) => ({ row: MemoryStore.clone(r), conflict: onConflict(r) })); // may throw before any change
     const now = new Date().toISOString();
     for (const { row, conflict } of prepared) {
       this.rows.set(MemoryStore.key(row.table, row.id), row);
       const existing = [...this.outbox].reverse().find(
-        (m) => m.user_id === row.user_id && m.table === row.table && m.row_id === row.id && m.status === 'pending');
+        (m) => m.user_id === (actorId ?? row.user_id) && m.table === row.table && m.row_id === row.id && m.status === 'pending');
       if (existing) {
         existing.payload = MemoryStore.clone(row.data);
         existing.version += 1;
       } else {
         this.outbox.push({
-          seq: ++this.seq, user_id: row.user_id, table: row.table, row_id: row.id,
+          seq: ++this.seq, user_id: actorId ?? row.user_id, table: row.table, row_id: row.id,
           payload: MemoryStore.clone(row.data), on_conflict: conflict, version: 1,
           status: 'pending', attempts: 0, last_error: null, created_at: now,
         });

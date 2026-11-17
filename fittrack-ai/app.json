@@ -29,7 +29,8 @@
       "expo-router",
       "expo-sqlite",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-audio"
     ],
     "scheme": "fittrack",
     "experiments": {

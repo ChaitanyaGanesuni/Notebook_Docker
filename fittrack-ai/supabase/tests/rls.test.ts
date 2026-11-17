@@ -207,6 +207,24 @@ describe('shared library rows', () => {
   });
 });
 
+describe('training seed', () => {
+  it('has the shared library, three tracks and six moves each, readable by any user', async () => {
+    const n = async (sql: string) => Number((await as(carol, (db) => db.query<{ n: string }>(sql)))[0]!.n);
+    expect(await n(`select count(*) as n from exercises where user_id is null`)).toBe(15);
+    expect(await n(`select count(*) as n from workout_tracks where user_id is null`)).toBe(3);
+    expect(await n(`select count(*) as n from track_exercises where user_id is null`)).toBe(18);
+    const men = await as(carol, (db) => db.query<{ slug: string }>(`select e.slug from track_exercises te join exercises e on e.id = te.exercise_id join workout_tracks t on t.id = te.track_id where t.slug = 'men' and t.user_id is null order by te.position`));
+    expect(men.map((r) => r.slug)).toEqual(['incline-push-up', 'squat', 'reverse-lunge', 'glute-bridge', 'plank', 'dead-bug']);
+  });
+  it('lets a user keep their own version of a track and nobody else see it', async () => {
+    const track = (await as(carol, (db) => db.query<{ id: string }>(`insert into workout_tracks (user_id, slug, name) values ($1, 'men', 'Men') returning id`, [carol])))[0]!.id;
+    await as(carol, (db) => db.exec(`insert into track_exercises (user_id, track_id, exercise_id, position, sets, target, level) values ($1, $2, 'e1000000-0000-4000-8000-000000000002', 1, 3, 20, 1)`, [carol, track]));
+    expect(await as(alice, (db) => db.query(`select 1 from track_exercises where track_id = $1`, [track]))).toHaveLength(0);
+    expect(await errorCode(as(alice, (db) => db.exec(`insert into track_exercises (user_id, track_id, exercise_id, position) values ($1, $2, 'e1000000-0000-4000-8000-000000000002', 2)`, [alice, track])))).toBe(RLS_VIOLATION);
+    await sudo.exec(`delete from workout_tracks where id = $1`, [track]);
+  });
+});
+
 describe('constraints', () => {
   it('stores the first weigh-in exactly: 73.0 kg on 12 November 2026', async () => {
     await as(carol, (db) => db.exec(`insert into weight_logs (user_id, date, weight_kg) values ($1, '2026-11-12', 73.0)`, [carol]));
